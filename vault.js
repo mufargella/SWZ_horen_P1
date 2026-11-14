@@ -66,17 +66,33 @@
     return null;
   }
 
+  // Start page (Aspekte): the whole page stays visible. The password is asked
+  // when the visitor picks the Aspekte card or tries to use the exercises.
+  // The Umgangssprache card is a normal link to its own page (which asks there).
+  const UNLOCK_TRIGGERS = [
+    'a.course-choice[aria-current="page"]', '#continue-learning', '[data-vault-unlock]',
+    '#lesson-list', '#learning-panel button', '#learning-panel audio', '#learning-panel a', 'a[data-vault-file]',
+  ].join(',');
   function waitForChoice() {
-    // Start page: show the two section cards; picking Aspekte asks for its password.
-    // The Umgangssprache card is a normal link to its own page (which asks there).
     return new Promise((resolve) => {
       root.classList.add('vault-choose');
+      const list = document.getElementById('lesson-list');
+      const loadingMarkup = list ? list.innerHTML : '';
+      if (list) {
+        const panel = document.createElement('div');
+        panel.className = 'vault-library-lock';
+        panel.innerHTML = '<p>Die Übungen sind mit einem Passwort geschützt.<span lang="ar-EG" dir="rtl">التمارين محمية بباسورد.</span></p>' +
+          '<button class="primary-button" type="button" data-vault-unlock>Passwort eingeben <span aria-hidden="true">↗</span></button>';
+        list.replaceChildren(panel);
+      }
       const onClick = (event) => {
-        const card = event.target.closest?.('a.course-choice[aria-current="page"]');
-        if (!card) return;
-        event.preventDefault();
+        const trigger = event.target.closest?.(UNLOCK_TRIGGERS);
+        if (!trigger) return;
+        // PDF links keep their own handler: it waits for the unlock, then downloads.
+        if (!trigger.matches('a[data-vault-file]')) { event.preventDefault(); event.stopPropagation(); }
         document.removeEventListener('click', onClick, true);
         root.classList.remove('vault-choose');
+        if (list) list.innerHTML = loadingMarkup;
         resolve();
       };
       document.addEventListener('click', onClick, true);
