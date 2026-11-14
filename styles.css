@@ -530,3 +530,11 @@ html.vault-locked, html.vault-locked body { overflow: hidden; }
 .vault-error span[dir="rtl"] { text-align: right; }
 .vault-switch { display: inline-block; margin-top: 26px; font-size: 15px; color: var(--muted); }
 @media (max-width: 520px) { .vault-card { padding: 30px 22px 26px; } .vault-row .primary-button { flex: 1 1 100%; justify-content: center; } }
+/* Start page before a section is unlocked: show only the section choice */
+html.vault-choose main > :not(#courses), html.vault-choose .source-downloads, html.vault-choose .site-header > nav, html.vault-choose .book-badge, html.vault-choose .skip-link, html.vault-choose .site-footer > span:nth-child(2), html.vault-choose .site-footer > a { display: none !important; }
+html.vault-choose main { min-height: calc(100vh - 230px); padding-block: 4vh 6vh; }
+html.vault-choose .course-choice[aria-current="page"] { border: 1px solid var(--line); padding: 18px 22px; background: var(--cream); }
+html.vault-choose .course-choice:hover { border-color: var(--accent); }
+html.vault-choose [data-course-progress] { font-size: 0; }
+html.vault-choose [data-course-progress]::after { content: "Bereich öffnen"; font-size: 12px; }
+@media (max-width: 600px) { html.vault-choose .course-choice[aria-current="page"] { padding: 15px 18px; } }

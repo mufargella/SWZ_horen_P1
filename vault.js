@@ -12,10 +12,18 @@
 (() => {
   'use strict';
   const IS_UMG = document.documentElement.dataset.level === 'B1+–B2';
+  // The start page (Aspekte) first shows only the section choice; the
+  // password is asked after a section is picked. "back" returns to that choice.
   const SECTION = IS_UMG
-    ? {id: 'umgangssprache', name: 'Umgangssprache · B1+–B2', other: '../', otherName: 'Aspekte neu B2'}
-    : {id: 'aspekte', name: 'Aspekte neu B2', other: './umgangssprache/', otherName: 'Umgangssprache · B1+–B2'};
+    ? {id: 'umgangssprache', name: 'Umgangssprache · B1+–B2', back: '../'}
+    : {id: 'aspekte', name: 'Aspekte neu B2', back: './'};
   const STORAGE_KEY = `swz-vault-${SECTION.id}-v1`;
+  // Runs in <head> (not deferred) so the choice view appears without a flash
+  // of the locked page. Corrected below once the stored key is verified.
+  const root = document.documentElement;
+  let hasStoredKey = false;
+  try { hasStoredKey = !!localStorage.getItem(STORAGE_KEY); } catch (_) { /* No storage. */ }
+  if (!IS_UMG && !hasStoredKey) root.classList.add('vault-choose');
   const CHECK_TEXT = 'SWZ-VAULT-OK';
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
@@ -58,9 +66,25 @@
     return null;
   }
 
+  function waitForChoice() {
+    // Start page: show the two section cards; picking Aspekte asks for its password.
+    // The Umgangssprache card is a normal link to its own page (which asks there).
+    return new Promise((resolve) => {
+      root.classList.add('vault-choose');
+      const onClick = (event) => {
+        const card = event.target.closest?.('a.course-choice[aria-current="page"]');
+        if (!card) return;
+        event.preventDefault();
+        document.removeEventListener('click', onClick, true);
+        root.classList.remove('vault-choose');
+        resolve();
+      };
+      document.addEventListener('click', onClick, true);
+    });
+  }
+
   function showLock() {
     return new Promise((resolve) => {
-      const root = document.documentElement;
       root.classList.add('vault-locked');
       const overlay = document.createElement('div');
       overlay.className = 'vault-overlay';
@@ -79,7 +103,7 @@
     </div>
     <p class="vault-error" role="alert" hidden></p>
   </form>
-  <a class="text-link vault-switch" href="${SECTION.other}">Zum Bereich ${SECTION.otherName} <span aria-hidden="true">→</span></a>
+  <a class="text-link vault-switch" href="${SECTION.back}"><span aria-hidden="true">←</span> Zurück zur Bereichsauswahl</a>
 </div>`;
       overlay.querySelector('#vault-title').textContent = SECTION.name;
       document.body.append(overlay);
@@ -126,11 +150,15 @@
 
   const ready = (async () => {
     const response = await fetch('./assets/vault.json', {cache: 'no-cache'});
-    if (response.status === 404) { plain = true; return; }
+    if (response.status === 404) { plain = true; root.classList.remove('vault-choose'); return; }
     if (!response.ok) throw new Error(`Vault config HTTP ${response.status}`);
     config = await response.json();
     if (!window.crypto?.subtle) throw new Error('Web Crypto is not available');
-    key = await storedKey() || await showLock();
+    if (document.readyState === 'loading') await new Promise((r) => document.addEventListener('DOMContentLoaded', r, {once: true}));
+    key = await storedKey();
+    if (key) { root.classList.remove('vault-choose'); return; }
+    if (!IS_UMG) await waitForChoice();
+    key = await showLock();
   })();
 
   async function readWithProgress(response, onProgress) {
