@@ -459,7 +459,8 @@
     releaseAudio();
     const request = audioRequest;
     setAudioStatus('Audio wird geladen …');
-    window.SWZVault.objectURL(lesson.audio, 'audio/mpeg').then((url) => {
+    const onProgress = (percent) => { if (request === audioRequest) setAudioStatus(`Audio wird geladen … ${percent} %`); };
+    window.SWZVault.objectURL(lesson.audio, 'audio/mpeg', onProgress).then((url) => {
       const isBlob = url.startsWith('blob:');
       if (request !== audioRequest || current !== lesson) { if (isBlob) URL.revokeObjectURL(url); return; }
       if (isBlob) audioObjectURL = url;

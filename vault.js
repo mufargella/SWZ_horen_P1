@@ -133,20 +133,40 @@
     key = await storedKey() || await showLock();
   })();
 
-  async function bytes(path, fetchOptions = {}) {
+  async function readWithProgress(response, onProgress) {
+    const total = Number(response.headers.get('content-length')) || 0;
+    if (!onProgress || !total || !response.body?.getReader) return response.arrayBuffer();
+    const reader = response.body.getReader();
+    const chunks = [];
+    let received = 0;
+    let lastPercent = -1;
+    for (;;) {
+      const {done, value} = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      received += value.length;
+      const percent = Math.min(99, Math.floor((received / total) * 100));
+      if (percent !== lastPercent) { lastPercent = percent; onProgress(percent); }
+    }
+    const out = new Uint8Array(received);
+    let offset = 0;
+    for (const chunk of chunks) { out.set(chunk, offset); offset += chunk.length; }
+    return out.buffer;
+  }
+  async function bytes(path, fetchOptions = {}, onProgress = null) {
     await ready;
     const response = await fetch(plain ? path : `${path}.enc`, fetchOptions);
     if (!response.ok) throw new Error(`HTTP ${response.status} for ${path}`);
-    const buffer = await response.arrayBuffer();
+    const buffer = await readWithProgress(response, onProgress);
     return plain ? buffer : decrypt(buffer);
   }
   async function json(path) {
     return JSON.parse(decoder.decode(await bytes(path, {cache: 'no-cache'})));
   }
-  async function objectURL(path, type) {
+  async function objectURL(path, type, onProgress = null) {
     await ready;
     if (plain) return path;
-    return URL.createObjectURL(new Blob([await bytes(path)], {type}));
+    return URL.createObjectURL(new Blob([await bytes(path, {}, onProgress)], {type}));
   }
 
   // PDF links carry data-vault-file; decrypt and hand the file over as a download.
